@@ -1,6 +1,4 @@
-flask
 yfinance
 finnhub-python
-mysql-connector-python
+psycopg2
 schedule
-gunicorn
