@@ -1,47 +1,32 @@
+import os
 import yfinance as yf
 import finnhub
 import psycopg2
-import psycopg2.pool
 import schedule
 import time
-import os
 
 # List of stocks to track
 symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "SPY", "QQQ", "BTC-USD", "ETH-USD"]
 
-# Finnhub API client
-finnhub_client = finnhub.Client(api_key="cv7isb1r01qpecig579gcv7isb1r01qpecig57a0")
+# Fetch credentials from environment variables
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+DB_HOST = os.getenv("DB_HOST")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
 
-# Database connection details (Supabase PostgreSQL)
-DB_HOST = "db.mkkwerzncbytpvneggzu.supabase.co"
-DB_NAME = "postgres"
-DB_USER = "postgres"
-DB_PASS = os.getenv("SUPABASE_PASS")  # Use an environment variable for security
-DB_PORT = "5432"
-
-# PostgreSQL Connection Pool
-try:
-    db_pool = psycopg2.pool.SimpleConnectionPool(
-        minconn=1,
-        maxconn=5,
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS,
-        port=DB_PORT,
-        sslmode="require"
-    )
-    print("✅ Database connection pool created successfully!")
-except Exception as e:
-    print(f"⚠️ Error creating database connection pool: {e}")
-    exit()
+# Initialize Finnhub API client
+finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
 def fetch_and_store_stock_data():
-    conn = None
-    cursor = None
-
     try:
-        conn = db_pool.getconn()  # Get connection from pool
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS,
+            sslmode="require"
+        )
         cursor = conn.cursor()
 
         for symbol in symbols:
@@ -69,25 +54,19 @@ def fetch_and_store_stock_data():
             print(f"✅ Data updated for {symbol} at {time.strftime('%H:%M:%S')}")
 
         conn.commit()
+        conn.close()
 
     except Exception as e:
         print(f"⚠️ Error: {e}")
 
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            db_pool.putconn(conn)  # Return connection to pool
-
 # Schedule job every 5 minutes
 schedule.every(5).minutes.do(fetch_and_store_stock_data)
-
-print("🚀 Stock data fetcher is running...")
 
 # Keep running the script
 while True:
     schedule.run_pending()
     time.sleep(1)
+
 
 
 
