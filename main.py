@@ -1,30 +1,40 @@
-from flask import Flask
 import yfinance as yf
 import finnhub
-import mysql.connector
+import psycopg2
 import schedule
 import time
 
-app = Flask(__name__)
+# List of stocks to track
+symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "SPY", "QQQ", "BTC-USD", "ETH-USD"]
 
-finnhub_client = finnhub.Client(api_key="cv7isb1r01qpecig579gcv7isb1r01qpecig57a0")
+# Finnhub API client
+finnhub_client = finnhub.Client(api_key="YOUR_FINNHUB_API_KEY")
 
-SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "SPY", "QQQ", "BTC-USD", "ETH-USD"]
+# Database connection details (Supabase PostgreSQL)
+DB_HOST = "your-supabase-host"
+DB_NAME = "postgres"
+DB_USER = "your-supabase-user"
+DB_PASS = "your-supabase-password"
 
 def fetch_and_store_stock_data():
     try:
-        conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="#Falguniak1979",
-            database="stock_data"
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS,
+            sslmode="require"
         )
         cursor = conn.cursor()
 
-        for symbol in SYMBOLS:
+        for symbol in symbols:
             quote = finnhub_client.quote(symbol)
             stock = yf.Ticker(symbol)
-            volume = int(stock.history(period="1d")["Volume"].iloc[-1]) if "Volume" in stock.history(period="1d") else 0
+            
+            try:
+                volume = int(stock.history(period="1d")["Volume"].iloc[-1])
+            except:
+                volume = 0  # If volume data is unavailable
 
             cursor.execute("""
                 INSERT INTO real_time_stocks (symbol, open, high, low, current_price, previous_close, volume)
@@ -47,14 +57,14 @@ def fetch_and_store_stock_data():
     except Exception as e:
         print(f"⚠️ Error: {e}")
 
+# Schedule job every 5 minutes
 schedule.every(5).minutes.do(fetch_and_store_stock_data)
 
-@app.route("/")
-def home():
-    return "Stock Data Fetcher is Running"
+# Keep running the script
+while True:
+    schedule.run_pending()
+    time.sleep(1)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
 
 
 
