@@ -1,4 +1,4 @@
 yfinance
 finnhub-python
-psycopg2-binary
-schedule
+requests
+
